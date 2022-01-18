@@ -92,7 +92,7 @@ class Blockchain {
      */
     requestMessageOwnershipVerification(address) {
         return new Promise((resolve) => {
-            resolve(`${address}:${new Date().getTime().toString().slice(0, -3)}:starRegistry`)
+            resolve(`${address}:${new Date().getTime().toString().slice(0, -3)}:starRegistry`);
         });
     }
 
@@ -121,26 +121,25 @@ class Blockchain {
                     let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
                     let parsedTime = parseInt(message.split(':')[1]);
 
-                    if (currentTime - timestamp <= 300) {
+                    if (currentTime - parsedTime <= 300) {
                         let valid = bitcoinMessage.verify(message, address, signature);
                         if (valid == true) {
-                            const block = await self._addBlock(new BlockClass.Block({
+                            const block = self._addBlock(new BlockClass.Block({
                                 owner: address,
                                 data: star
                             }));
                             if (block == true) {
-                                resolve(block)
+                                resolve(block);
                             }
-                            resolve(null)
                         }
-                        resolve(null)
                     }
-                    resolve(null)
                 }
-                resolve(null)
+                else {
+                    resolve(null);
+                }
             }
             catch{
-                reject(Error('error submiting star'))
+                reject(Error('error submiting star'));
             }
         });
     }
@@ -194,13 +193,13 @@ class Blockchain {
                 for (const block of self.chain) {
                     const blockData = block.getBData();
                     if (blockData && blockData.owner === address) {
-                        stars.push(blockData)
+                        stars.push(blockData);
                     }
                 }
-                resolve(stars)
+                resolve(stars);
             }
             catch{
-                reject(Error("Cannot count stars"))
+                reject(Error("Cannot count stars"));
             }
         });
     }
@@ -228,7 +227,7 @@ class Blockchain {
                     resolve(errorLog);
                 }
             catch{
-                reject(Error("Cannot validate blocks"))
+                reject(Error("Cannot validate blocks"));
             }
         });
     }
