@@ -64,21 +64,29 @@ class Blockchain {
     _addBlock(block) {
         let self = this;
         return new Promise(async (resolve, reject) => {
-            try {
-                block.height = self.chain.length;
-                block.time = new Date().getTime().toString().slice(0,-3);
-                if(self.chain.length>0){
-                block.previousblockhash = self.chain[self.chain.length-1].hash; //if a previous block exists, use the hash of that as previousBlockHash
-                }
-                
-                block.hash = SHA256(JSON.stringify(block)).toString(); //creates new Hash for the block
-                self.chain.push(block); 
+
+            let newBlock = block;
+            newBlock.height = await self.getChainHeight()+1;
+
+
+            if(newBlock.height > 0){
+                newBlock.time = new Date().getTime().toString().slice(0,-3);
+                newBlock.previousBlockHash = self.chain[newBlock.height-1].hash;
+
+                newBlock.hash = SHA256(JSON.stringify(newBlock)).toString();
+                self.chain.push(newBlock);
                 self.height++;
-                resolve(block);
-              }
-              catch(err) {
-                reject (err);
-              }
+                resolve(newBlock);
+
+            } else {
+                newBlock.time = new Date().getTime().toString().slice(0,-3);
+
+                newBlock.hash = SHA256(JSON.stringify(newBlock)).toString();
+                self.chain.push(newBlock);
+                self.height++;
+                resolve(newBlock);
+            }
+           
         });
     }
 
@@ -86,13 +94,14 @@ class Blockchain {
      * The requestMessageOwnershipVerification(address) method
      * will allow you  to request a message that you will use to
      * sign it with your Bitcoin Wallet (Electrum or Bitcoin Core)
-     * This is the first step before submit your Block.
+     * This is the first step before submit your Block.z
      * The method return a Promise that will resolve with the message to be signed
      * @param {*} address 
      */
     requestMessageOwnershipVerification(address) {
         return new Promise((resolve) => {
-            resolve(`${address}:${new Date().getTime().toString().slice(0, -3)}:starRegistry`);
+            let response = '';
+            resolve(response.concat(address, ':', new Date().getTime().toString().slice(0, -3),':starRegistry'));
         });
     }
 
@@ -116,30 +125,22 @@ class Blockchain {
     submitStar(address, message, signature, star) {
         let self = this;
         return new Promise(async (resolve, reject) => {
-            try{
-                if (message.split(':').length === 3) {
-                    let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
-                    let parsedTime = parseInt(message.split(':')[1]);
 
-                    if (currentTime - parsedTime <= 300) {
-                        let valid = bitcoinMessage.verify(message, address, signature);
-                        if (valid == true) {
-                            const block = self._addBlock(new BlockClass.Block({
-                                owner: address,
-                                data: star
-                            }));
-                            if (block == true) {
-                                resolve(block);
-                            }
-                        }
-                    }
+            let time = parseInt(message.split(':')[1]);
+            let currentTime = parseInt(new Date().getTime().toString().slice(0, -3));
+            let maxTime = 300000;
+
+            if(currentTime < (time + maxTime)){
+                
+                if(bitcoinMessage.verify(message, address, signature)){
+                    let newBlock = new BlockClass.Block({owner: address, star: star});
+                    resolve(await self._addBlock(newBlock));
+
+                } else {
+                    reject('Cannot Submit');
                 }
-                else {
-                    resolve(null);
-                }
-            }
-            catch{
-                reject(Error('error submiting star'));
+            } else {
+                reject('Cannot Submit');;
             }
         });
     }
@@ -192,7 +193,7 @@ class Blockchain {
             try{
                 for (const block of self.chain) {
                     const blockData = block.getBData();
-                    if (blockData && blockData.owner === address) {
+                    if (blockData && blockData.owner == address) {
                         stars.push(blockData);
                     }
                 }
@@ -212,25 +213,29 @@ class Blockchain {
      */
     validateChain() {
         let self = this;
-        let errorLog = [];
+
         return new Promise(async (resolve, reject) => {
-            try{
-                for (const block of self.chain) {
-                        const valid = block.validate();
-                        if (!valid){
-                            errorLog.push({
-                                block,
-                                error: "Unable to validate block"
-                            })
-                        }
-                    }
-                    resolve(errorLog);
+
+            let errors = [];
+
+            //starting after genesis block
+            for (let i=1; i<self.chain.length;i++) {
+                let previousBlockHash = self.chain[i].previousBlockHash;
+                let hashToCompare = self.chain[i-1].hash;
+
+                if (previousBlockHash==hashToCompare){
+                    //do nothing
                 }
-            catch{
-                reject(Error("Cannot validate blocks"));
+                else{
+                    errors.push(`Block ${self.chain[i].height} is not valid`)
+                }
+
+
             }
+            resolve(errors);
         });
     }
+
 
 }
 
